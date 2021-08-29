@@ -1,0 +1,879 @@
+# Mangrove
+var baseChange = [{featureType: 'all', stylers: [{invert_lightness: "#0e1626"}]}];
+
+Map.setOptions('baseChange', {'baseChange': baseChange});
+
+//Map.addLayer(sampah,imageVisParam,'Pemodelan Sampah');
+Map.centerObject(sampah,5)
+
+var WI = (sampah.divide(20.77155))
+
+//Map.addLayer(WI,imageVisParam3,'Indeks Pemodelan Sampah');
+
+var sampah_di_mangrove = WI.clip(area);
+
+var area = ee.FeatureCollection(gmw); 
+var styling = {color: 'Black', fillColor: '00000000'};
+//Map.addLayer(area, styling, "Mangrove");
+
+var sampah_di_mangrove = WI.clip(area);
+
+//Map.addLayer(sampah_di_mangrove,imageVisParam4,'Sampah di Mangrove');
+
+// sampah di mangrove yang tidak di rescalle
+
+var sampah_di_mangrove2 = sampah.clip(area);
+//Map.addLayer(sampah_di_mangrove2,imageVisParam4,'Sampah di Mangrove no rescalle');
+
+var sampahclass = ee.Image(1) //RECLASS RENTANG Sampah
+          .where(sampah_di_mangrove2.gt(0.639).and(sampah_di_mangrove2.lte(1.49)), 2)
+          .where(sampah_di_mangrove2.gt(1.49).and(sampah_di_mangrove2.lte(3.6)), 3)
+          .where(sampah_di_mangrove2.gt(3.6).and(sampah_di_mangrove2.lte(20.77155)), 4);
+          
+var intervals1 =
+  '<RasterSymbolizer>' +
+    '<ColorMap type="intervals" extended="false" >' +
+      '<ColorMapEntry color="#1008ff" quantity="1" label="1"/>' + // Sangat Rendah
+      '<ColorMapEntry color="#04fddf" quantity="2" label="2" />' + // Rendah
+      '<ColorMapEntry color="#f6ff04" quantity="3" label="3" />' + // Tinggi
+      '<ColorMapEntry color="#ff3900" quantity="4" label="4" />' + // Sangat Tinggi
+    '</ColorMap>' +
+  '</RasterSymbolizer>';
+  
+var sampah_classified = sampahclass.sldStyle(intervals1).clip(area);
+//Map.addLayer(sampahclass.sldStyle(intervals1).clip(area), {}, 'Sampah classified');
+
+var landsat8 = L8
+.filterDate("2018-01-01","2018-12-31")
+.sort('CLOUD_COVER', false)
+.mean(); 
+
+
+//Compute Turbidity
+
+var red = landsat8.select('B4');
+var green = landsat8.select('B3');
+var turbidity = red.subtract(green).divide(red.add(green)).rename('TURBIDITY_2018');
+//Map.addLayer(turbidity.clip(area),imageVisParam2,'Turbidity Indeks');
+
+var turbiclass = ee.Image(4) //RECLASS RENTANG Turbidity
+          .where(turbidity.gt(-0.1).and(turbidity.lte(-0.05)), 3)
+          .where(turbidity.gt(-0.05).and(turbidity.lte(0)), 2)
+          .where(turbidity.gt(0).and(turbidity.lte(0.1)), 1);
+          
+var intervals4 =
+  '<RasterSymbolizer>' +
+    '<ColorMap type="intervals" extended="false" >' +
+      '<ColorMapEntry color="#ff3900" quantity="4" label="1"/>' + // Sangat Rendah
+      '<ColorMapEntry color="#f6ff04" quantity="3" label="2" />' + // Rendah
+      '<ColorMapEntry color="#04fddf" quantity="2" label="3" />' + // Tinggi
+      '<ColorMapEntry color="#1008ff" quantity="1" label="4" />' + // Sangat Tinggi
+    '</ColorMap>' +
+  '</RasterSymbolizer>';
+  
+var turbi_classified = turbiclass.sldStyle(intervals4).clip(area);
+//Map.addLayer(turbiclass.sldStyle(intervals4).clip(area), {}, 'Turbidity classified');
+//Map.addLayer(turbi_classified)
+//Pembobotan
+
+var bs = sampah_di_mangrove;
+var bt = turbidity;
+
+var bobotsampah = bs.divide(bs.add(bt));
+var bobotturbidity = bt.divide(bs.add(bt));
+
+// Kualitas Air
+
+var paramsampah = sampah_di_mangrove.multiply(bobotsampah);
+var paramturbidity = turbidity.multiply(bobotturbidity);
+
+var WQI = paramsampah.add(paramturbidity);
+
+//Map.addLayer(WQI,imageVisParam4,'Kekeruhan Dampak Sampah')
+var wqiclass = ee.Image(1) //RECLASS RENTANG Turbidity
+          .where(WQI.gt(0.03195).and(WQI.lte(0.0745)), 2)
+          .where(WQI.gt(0.0745).and(WQI.lte(0.18)), 3)
+          .where(WQI.gt(0.18).and(WQI.lte(1)), 4);
+          
+var intervals7 =
+  '<RasterSymbolizer>' +
+    '<ColorMap type="intervals" extended="false" >' +
+      '<ColorMapEntry color="#1008ff" quantity="1" label="1"/>' + // Sangat Rendah
+      '<ColorMapEntry color="#04fddf" quantity="2" label="2" />' + // Rendah
+      '<ColorMapEntry color="#f6ff04" quantity="3" label="3" />' + // Tinggi
+      '<ColorMapEntry color="#ff3900" quantity="4" label="4" />' + // Sangat Tinggi
+    '</ColorMap>' +
+  '</RasterSymbolizer>';
+var wqi_classified = wqiclass.sldStyle(intervals7).clip(area);
+//Map.addLayer(wqiclass.sldStyle(intervals7).clip(area), {}, 'Wqi classified');
+//Map.addLayer(wqi_classified)
+
+//compute NDVI
+var red = landsat8.select('B4');
+var nir = landsat8.select('B5');
+var ndvi = nir.subtract(red).divide(nir.add(red)).rename('NDVI_2018');
+//Map.addLayer(ndvi.clip(area),imageVisParam3,'NDVI');
+
+var ndviclass = ee.Image(4) //RECLASS RENTANG SUHU
+          .where(ndvi.gt(0.15).and(ndvi.lte(0.25)), 3)
+          .where(ndvi.gt(0.25).and(ndvi.lte(0.35)), 2)
+          .where(ndvi.gt(0.35).and(ndvi.lte(1)), 1);
+          
+var intervals2 =
+  '<RasterSymbolizer>' +
+    '<ColorMap type="intervals" extended="false" >' +
+      '<ColorMapEntry color="#ff3900" quantity="4" label="1"/>' + // Sangat Rendah
+      '<ColorMapEntry color="#f6ff04" quantity="3" label="2" />' + // Rendah
+      '<ColorMapEntry color="#04fddf" quantity="2" label="3" />' + // Tinggi
+      '<ColorMapEntry color="#1008ff" quantity="1" label="4" />' + // Sangat Tinggi
+    '</ColorMap>' +
+  '</RasterSymbolizer>';
+  
+var ndvi_classified = ndviclass.sldStyle(intervals2).clip(area);
+//Map.addLayer(ndviclass.sldStyle(intervals2).clip(area), {}, 'NDVI classified');
+
+//SUHU
+var lst = temperature
+.filterDate("2018-01-01","2018-12-31")
+.select("LST_Day_1km")
+.mean();
+
+var lst_kelvin = lst.multiply(0.02); //kelvin
+var lst_celsius = lst_kelvin.subtract(273); //celsius
+
+//Map.addLayer(lst_celsius.clip(area),imageVisParam5,'Suhu Permukaan')
+var lstclass = ee.Image(1) //RECLASS RENTANG LST
+          .where(lst_celsius.gt(20).and(lst_celsius.lte(25)), 2)
+          .where(lst_celsius.gt(25).and(lst_celsius.lte(30)), 3)
+          .where(lst_celsius.gt(30).and(lst_celsius.lte(40)), 4);
+          
+var intervals3 =
+  '<RasterSymbolizer>' +
+    '<ColorMap type="intervals" extended="false" >' +
+      '<ColorMapEntry color="#1008ff" quantity="1" label="1"/>' + // Sangat Rendah
+      '<ColorMapEntry color="#04fddf" quantity="2" label="2" />' + // Rendah
+      '<ColorMapEntry color="#f6ff04" quantity="3" label="3" />' + // Tinggi
+      '<ColorMapEntry color="#ff3900" quantity="4" label="4" />' + // Sangat Tinggi
+    '</ColorMap>' +
+  '</RasterSymbolizer>';
+  
+var lst_classified = lstclass.sldStyle(intervals3).clip(area);
+//Map.addLayer(lstclass.sldStyle(intervals3).clip(area), {}, 'LST classified');
+
+//Savi
+
+var savi =((nir.subtract(red).divide(nir.add(red))).multiply(1.5)).rename('SAVI');
+//Map.addLayer(savi.clip(area),imageVisParam7,'SAVI');
+
+
+var bw = WQI;
+var bn = ndvi;
+
+var bobotwaste = bw.divide(bn.add(bw));
+var bobotndvii = bn.divide(bw.add(bn));
+
+// Kualitas Air
+
+var paramwaste = WQI.multiply(bobotwaste);
+var paramndvii = ndvi.multiply(bobotndvii);
+
+var ndvi2 = paramwaste.add(paramndvii);
+
+var savi2 = ndvi2.multiply(1.5).rename('SAVI2');
+
+var savi2class = ee.Image(4) //RECLASS RENTANG SUHU
+          .where(savi2.gt(0.225).and(savi2.lte(0.375)), 3)
+          .where(savi2.gt(0.375).and(savi2.lte(0.525)), 2)
+          .where(savi2.gt(0.525).and(savi2.lte(1.5)), 1);
+          
+var intervals9 =
+  '<RasterSymbolizer>' +
+    '<ColorMap type="intervals" extended="false" >' +
+      '<ColorMapEntry color="#ff3900" quantity="4" label="1"/>' + // Sangat Rendah
+      '<ColorMapEntry color="#f6ff04" quantity="3" label="2" />' + // Rendah
+      '<ColorMapEntry color="#04fddf" quantity="2" label="3" />' + // Tinggi
+      '<ColorMapEntry color="#1008ff" quantity="1" label="4" />' + // Sangat Tinggi
+    '</ColorMap>' +
+  '</RasterSymbolizer>';
+  
+var savi2_classified = savi2class.sldStyle(intervals9).clip(area);
+//Map.addLayer(savi2class.sldStyle(intervals9).clip(area), {}, 'Potensi Penyimpanan Karbon Mangrove Akibat Kualitas Air');
+
+
+
+
+var saviclass = ee.Image(4) //RECLASS RENTANG SUHU
+          .where(savi.gt(0.225).and(savi.lte(0.375)), 3)
+          .where(savi.gt(0.375).and(savi.lte(0.525)), 2)
+          .where(savi.gt(0.525).and(savi.lte(1.5)), 1);
+          
+var intervals4 =
+  '<RasterSymbolizer>' +
+    '<ColorMap type="intervals" extended="false" >' +
+      '<ColorMapEntry color="#ff3900" quantity="4" label="1"/>' + // Sangat Rendah
+      '<ColorMapEntry color="#f6ff04" quantity="3" label="2" />' + // Rendah
+      '<ColorMapEntry color="#04fddf" quantity="2" label="3" />' + // Tinggi
+      '<ColorMapEntry color="#1008ff" quantity="1" label="4" />' + // Sangat Tinggi
+    '</ColorMap>' +
+  '</RasterSymbolizer>';
+  
+var savi_classified = saviclass.sldStyle(intervals4).clip(area);
+//Map.addLayer(saviclass.sldStyle(intervals4).clip(area), {}, 'savi classified');
+
+
+
+
+//wilayahsample
+var sample = ee.FeatureCollection.randomPoints({
+  region: geometry2,
+  points: 1000
+});
+
+//Map.addLayer(sample);
+
+
+
+//Turbidity dan NDVI
+
+var ndvindti = ndvi.select('NDVI_2018')
+  .addBands(turbidity.select('TURBIDITY_2018'))
+  .rename(['NDVI', 'TURBI']);
+
+var imgSamp1 = ndvindti.sampleRegions({
+  collection: sample,
+  scale: 30,
+})
+
+.map(function(feature) {
+  return feature.set('constant', 1);
+});
+
+var linearRegression1 = ee.Dictionary(imgSamp1.reduceColumns({
+  reducer: ee.Reducer.linearRegression({
+    numX: 2,
+    numY: 1
+  }),
+  selectors: ['constant', 'NDVI', 'TURBI']
+}));
+
+var coefList1 = ee.Array(linearRegression1.get('coefficients')).toList();
+
+var yInt1 = ee.List(coefList1.get(0)).get(0); // y-intercept
+var slope1 = ee.List(coefList1.get(1)).get(0); // slope
+
+var props1 = ee.List(['NDVI', 'TURBI']);
+var regressionVarsList1 = ee.List(imgSamp1.reduceColumns({
+  reducer: ee.Reducer.toList().repeat(props1.size()),
+  selectors: props1
+}).get('list'));
+
+var x1 = ee.Array(ee.List(regressionVarsList1.get(0)));
+var y2 = ee.Array(ee.List(regressionVarsList1.get(1)));
+
+
+var y3 = ee.Array(ee.List(regressionVarsList1.get(0)).map(function(x1) {
+  var y1 = ee.Number(x1).multiply(slope1).add(yInt1);
+  return y1;
+}));
+
+var yArr1 = ee.Array.cat([y2, y3], 1);
+
+
+print(ui.Chart.array.values({
+  array: yArr1,
+  axis: 0,
+  xLabels: x1})
+  .setChartType('ScatterChart')
+  .setOptions({
+    legend: {position: 'none'},
+    hAxis: {'title': 'NDVI'},
+    vAxis: {'title': 'Kekeruhan'},
+    series: {
+      0: {
+        pointSize: 0.2,
+        dataOpacity: 0.5,
+      },
+      1: {
+        pointSize: 0,
+        lineWidth: 2,
+      }
+    }
+  })
+);
+
+print(yArr1)
+
+
+
+//Sampah dan Kekeruhan 
+
+
+var sampahndti = sampah.select('b1')
+  .addBands(turbidity.select('TURBIDITY_2018'))
+  .rename(['sampah', 'TURBI']);
+
+var imgSamp2 = sampahndti.sampleRegions({
+  collection: sample,
+  scale: 30,
+})
+
+.map(function(feature) {
+  return feature.set('constant', 1);
+});
+
+var linearRegression2 = ee.Dictionary(imgSamp2.reduceColumns({
+  reducer: ee.Reducer.linearRegression({
+    numX: 2,
+    numY: 1
+  }),
+  selectors: ['constant', 'sampah', 'TURBI']
+}));
+
+var coefList2 = ee.Array(linearRegression2.get('coefficients')).toList();
+
+var yInt2 = ee.List(coefList2.get(0)).get(0); // y-intercept
+var slope2 = ee.List(coefList2.get(1)).get(0); // slope
+
+var props2 = ee.List(['sampah', 'TURBI']);
+var regressionVarsList2 = ee.List(imgSamp2.reduceColumns({
+  reducer: ee.Reducer.toList().repeat(props2.size()),
+  selectors: props2
+}).get('list'));
+
+var x2 = ee.Array(ee.List(regressionVarsList2.get(0)));
+var y3 = ee.Array(ee.List(regressionVarsList2.get(1)));
+
+
+var y4 = ee.Array(ee.List(regressionVarsList2.get(0)).map(function(x2) {
+  var y2 = ee.Number(x2).multiply(slope2).add(yInt2);
+  return y2;
+}));
+
+var yArr2 = ee.Array.cat([y3, y4], 1);
+
+
+print(ui.Chart.array.values({
+  array: yArr2,
+  axis: 0,
+  xLabels: x2})
+  .setChartType('ScatterChart')
+  .setOptions({
+    legend: {position: 'none'},
+    hAxis: {'title': 'Antropogenik'},
+    vAxis: {'title': 'Kekeruhan'},
+    series: {
+      0: {
+        pointSize: 0.2,
+        dataOpacity: 0.5,
+      },
+      1: {
+        pointSize: 0,
+        lineWidth: 2,
+      }
+    }
+  })
+);
+
+print(yArr2)
+
+
+//lstsav
+
+var lstsav = lst_celsius.select('LST_Day_1km')
+  .addBands(savi.select('SAVI'))
+  .rename(['LST', 'savi']);
+  
+
+var imgSamp = lstsav.sampleRegions({
+  collection: sample,
+  scale: 30,
+})
+
+.map(function(feature) {
+  return feature.set('constant', 1);
+});
+
+var linearRegression = ee.Dictionary(imgSamp.reduceColumns({
+  reducer: ee.Reducer.linearRegression({
+    numX: 2,
+    numY: 1
+  }),
+  selectors: ['constant', 'LST', 'savi']
+}));
+
+var coefList = ee.Array(linearRegression.get('coefficients')).toList();
+
+var yInt = ee.List(coefList.get(0)).get(0); // y-intercept
+var slope = ee.List(coefList.get(1)).get(0); // slope
+
+var props = ee.List(['LST', 'savi']);
+var regressionVarsList = ee.List(imgSamp.reduceColumns({
+  reducer: ee.Reducer.toList().repeat(props.size()),
+  selectors: props
+}).get('list'));
+
+var x = ee.Array(ee.List(regressionVarsList.get(0)));
+var y1 = ee.Array(ee.List(regressionVarsList.get(1)));
+
+
+var y2 = ee.Array(ee.List(regressionVarsList.get(0)).map(function(x) {
+  var y = ee.Number(x).multiply(slope).add(yInt);
+  return y;
+}));
+
+var yArr = ee.Array.cat([y1, y2], 1);
+
+
+print(ui.Chart.array.values({
+  array: yArr,
+  axis: 0,
+  xLabels: x})
+  .setChartType('ScatterChart')
+  .setOptions({
+    legend: {position: 'none'},
+    hAxis: {'title': 'Suhu Permukaan'},
+    vAxis: {'title': 'Stok Karbon'},
+    series: {
+      0: {
+        pointSize: 0.2,
+        dataOpacity: 0.5,
+      },
+      1: {
+        pointSize: 0,
+        lineWidth: 2,
+      }
+    }
+  })
+);
+
+print(yArr)
+
+
+//Sampah dan NDVI
+var samndvi = sampah.select('b1')
+  .addBands(ndvi.select('NDVI_2018'))
+  .rename(['waste', 'MHI']);
+  
+
+var imgSampah = samndvi.sampleRegions({
+  collection: sample,
+  scale: 30,
+})
+
+.map(function(feature) {
+  return feature.set('constant', 1);
+});
+
+var linearRegressionn = ee.Dictionary(imgSampah.reduceColumns({
+  reducer: ee.Reducer.linearRegression({
+    numX: 2,
+    numY: 1
+  }),
+  selectors: ['constant', 'waste', 'MHI']
+}));
+
+var coefListt = ee.Array(linearRegressionn.get('coefficients')).toList();
+
+var yIntt = ee.List(coefListt.get(0)).get(0); // y-intercept
+var slopee = ee.List(coefListt.get(1)).get(0); // slope
+
+var propss = ee.List(['waste', 'MHI']);
+var regressionVarsListt = ee.List(imgSampah.reduceColumns({
+  reducer: ee.Reducer.toList().repeat(propss.size()),
+  selectors: propss
+}).get('list'));
+
+var xa = ee.Array(ee.List(regressionVarsListt.get(0)));
+var yb = ee.Array(ee.List(regressionVarsListt.get(1)));
+
+
+var yc = ee.Array(ee.List(regressionVarsListt.get(0)).map(function(xa) {
+  var ya = ee.Number(xa).multiply(slopee).add(yIntt);
+  return ya;
+}));
+
+var yArrr = ee.Array.cat([yb, yc], 1);
+
+
+print(ui.Chart.array.values({
+  array: yArrr,
+  axis: 0,
+  xLabels: xa})
+  .setChartType('ScatterChart')
+  .setOptions({
+    legend: {position: 'none'},
+    hAxis: {'title': 'Sampah (ton/day)'},
+    vAxis: {'title': 'Kesehatan Mangrove'},
+    series: {
+      0: {
+        pointSize: 0.2,
+        dataOpacity: 0.5,
+      },
+      1: {
+        pointSize: 0,
+        lineWidth: 2,
+      }
+    }
+  })
+);
+
+print(yArrr)
+
+
+//Pembobotan
+
+var MHI = ndviclass;
+var waste = sampahclass;
+
+var bobotndvi = MHI.divide(MHI.add(waste));
+var bobotsampah = waste.divide(MHI.add(waste));
+
+// Sampah x mangrove
+// Produk 1
+var paramsampah = waste.multiply(bobotsampah);
+var paramndvi = MHI.multiply(bobotndvi);
+//Map.addLayer(bobotndvi.clip(area))
+//Map.addLayer(bobotsampah.clip(area))
+
+var dampak = paramsampah.add(paramndvi);
+
+//Map.addLayer(dampak.clip(area),imageVisParam11,'Potensi Dampak Sampah di Kawasan Mangrove')
+
+//Reclassify Dampak 0
+var dampak0class = ee.Image(1) //RECLASS RENTANG SUHU
+          .where(dampak.gt(1).and(dampak.lte(2)), 2)
+          .where(dampak.gt(2).and(dampak.lte(3)), 3)
+          .where(dampak.gt(3).and(dampak.lte(4)), 4);
+       
+var intervalsdampak0 =
+  '<RasterSymbolizer>' +
+    '<ColorMap type="intervals" extended="false" >' +
+      '<ColorMapEntry color="#04ff00" quantity="1" label="1"/>' + // Sangat Rendah
+      '<ColorMapEntry color="#fbff00" quantity="2" label="2" />' + // Rendah
+      '<ColorMapEntry color="#ffbe08" quantity="3" label="3" />' + // Tinggi
+      '<ColorMapEntry color="#ff0000" quantity="4" label="4" />' + // Sangat Tinggi
+    '</ColorMap>' +
+  '</RasterSymbolizer>';
+  
+var dampak0_classified = dampak0class.sldStyle(intervalsdampak0).clip(area);
+Map.addLayer(dampak0class.sldStyle(intervalsdampak0).clip(area), {}, 'Potensi Dampak Sampah di Kawasan Mangrove');
+//Pembobotan2
+
+var MHI = ndviclass;
+var KualitasAir = wqiclass;
+
+var bobotndvi1 = MHI.divide(MHI.add(KualitasAir));
+var bobotwqi = KualitasAir.divide(MHI.add(KualitasAir));
+
+// WQI x mangrove
+// Produk 2
+var paramwqi = KualitasAir.multiply(bobotwqi);
+var paramndvi1 = MHI.multiply(bobotndvi1);
+//Map.addLayer(paramwqi.clip(area))
+//Map.addLayer(paramndvi.clip(area))
+
+var dampak1 = paramwqi.add(paramndvi1);
+//Map.addLayer(dampak1.clip(area),imageVisParam11,'Potensi Dampak Kualitas Air di Kawasan Mangrove');
+
+//Reclassify Dampak 1
+var dampak1class = ee.Image(1) //RECLASS RENTANG SUHU
+          .where(dampak1.gt(1).and(dampak1.lte(2)), 2)
+          .where(dampak1.gt(2).and(dampak1.lte(3)), 3)
+          .where(dampak1.gt(3).and(dampak1.lte(4)), 4);
+        
+var intervalsdampak1 =
+  '<RasterSymbolizer>' +
+    '<ColorMap type="intervals" extended="false" >' +
+      '<ColorMapEntry color="#04ff00" quantity="1" label="1"/>' + // Sangat Rendah
+      '<ColorMapEntry color="#fbff00" quantity="2" label="2" />' + // Rendah
+      '<ColorMapEntry color="#ffbe08" quantity="3" label="3" />' + // Tinggi
+      '<ColorMapEntry color="#ff0000" quantity="4" label="4" />' + // Sangat Tinggi
+    '</ColorMap>' +
+  '</RasterSymbolizer>';
+  
+var dampak1_classified = dampak1class.sldStyle(intervalsdampak1).clip(area);
+Map.addLayer(dampak1class.sldStyle(intervalsdampak1).clip(area), {}, 'Potensi Dampak Kualitas Air di Kawasan Mangrove');
+var abc = dampak1class;
+// SAVI x LST
+//Pembobotan3
+
+var sav = saviclass;
+var lstt = lstclass;
+
+var bobotsavi1 = sav.divide(lstt.add(sav));
+var bobotlst = lstt.divide(sav.add(lstt));
+// Produk 3
+var paramsavi1 = sav.multiply(bobotsavi1);
+var paramlst = lstt.multiply(bobotlst);
+//Map.addLayer(paramwqi.clip(area))
+//Map.addLayer(paramndvi.clip(area))
+
+var dampak2 = paramsavi1.add(paramlst);
+//Map.addLayer(dampak2.clip(area),imageVisParam11,'Potensi Kenaikan Suhu');
+
+//SAVI 2 x LST 
+
+// SAVI x LST
+//Pembobotan3
+
+var sav2 = savi2class;
+var lstt2 = lstclass;
+
+var bobotsavi2 = sav2.divide(lstt2.add(sav2));
+var bobotlst2 = lstt2.divide(sav2.add(lstt2));
+// Produk 3
+var paramsavi2 = sav2.multiply(bobotsavi2);
+var paramlst2 = lstt2.multiply(bobotlst2);
+//Map.addLayer(paramwqi.clip(area))
+//Map.addLayer(paramndvi.clip(area))
+
+var dampak3 = paramsavi2.add(paramlst2);
+//Map.addLayer(dampak3.clip(area),imageVisParam11,'Potensi Peningkatan Suhu');
+
+//Reclassify Dampak 3
+var dampak3class = ee.Image(1) //RECLASS RENTANG SUHU
+          .where(dampak3.gt(1).and(dampak3.lte(2)), 2)
+          .where(dampak3.gt(2).and(dampak3.lte(3)), 3)
+          .where(dampak3.gt(3).and(dampak3.lte(4)), 4);
+       
+var intervalsdampak3 =
+  '<RasterSymbolizer>' +
+    '<ColorMap type="intervals" extended="false" >' +
+      '<ColorMapEntry color="#04ff00" quantity="1" label="1"/>' + // Sangat Rendah
+      '<ColorMapEntry color="#fbff00" quantity="2" label="2" />' + // Rendah
+      '<ColorMapEntry color="#ffbe08" quantity="3" label="3" />' + // Tinggi
+      '<ColorMapEntry color="#ff0000" quantity="4" label="4" />' + // Sangat Tinggi
+    '</ColorMap>' +
+  '</RasterSymbolizer>';
+  
+var dampak3_classified = dampak3class.sldStyle(intervalsdampak3).clip(area);
+Map.addLayer(dampak3class.sldStyle(intervalsdampak3).clip(area), {}, 'Potensi Peningkatan Suhu');
+var images = {
+  'Potensi Sampah': dampak0class.sldStyle(intervalsdampak0).clip(area),
+  'Potensi Kualitas Air': dampak1class.sldStyle(intervalsdampak1).clip(area),
+  'Potensi Kenaikan Suhu': dampak3class.sldStyle(intervalsdampak3).clip(area),
+  'Kerentanan Tingkat Penyimpanan Karbon Mangrove Akibat Kualitas Air' : savi2class.sldStyle(intervalsdampak0).clip(area),
+}
+;
+
+var leftMap = ui.Map();
+leftMap.setControlVisibility(false);
+var leftSelector = addLayerSelector(leftMap, 0, 'top-left');
+
+// Create the right map, and have it display layer 1.
+var rightMap = ui.Map();
+rightMap.setControlVisibility(false);
+var rightSelector = addLayerSelector(rightMap, 1, 'top-right');
+
+// Adds a layer selection widget to the given map, to allow users to change
+// which image is displayed in the associated map.
+function addLayerSelector(mapToChange, defaultValue, position) {
+  var label = ui.Label('Choose an image to visualize');
+
+  // This function changes the given map to show the selected image.
+  function updateMap(selection) {
+    mapToChange.layers().set(0, ui.Map.Layer(images[selection].clip(area)));
+  }
+
+  // Configure a selection dropdown to allow the user to choose between images,
+  // and set the map to update when a user makes a selection.
+  var select = ui.Select({items: Object.keys(images), onChange: updateMap});
+  select.setValue(Object.keys(images)[defaultValue], true);
+
+  var controlPanel =
+      ui.Panel({widgets: [label, select], style: {position: position}});
+
+  mapToChange.add(controlPanel);
+}
+
+
+/*
+ * Tie everything together
+ */
+
+// Create a SplitPanel to hold the adjacent, linked maps.
+var splitPanel = ui.SplitPanel({
+  firstPanel: leftMap,
+  secondPanel: rightMap,
+  wipe: true,
+  style: {stretch: 'both'}
+});
+
+// Set the SplitPanel as the only thing in the UI root.
+ui.root.widgets().reset([splitPanel]);
+var linker = ui.Map.Linker([leftMap, rightMap]);
+leftMap.setCenter(119.25, -3.8, 4);
+
+leftMap.setOptions('baseChange', {'baseChange': baseChange});
+rightMap.setOptions('baseChange', {'baseChange': baseChange});
+
+
+var logo = ee.Image('users/mercatoriaitb/judul1').visualize({
+    bands:  ['b1', 'b2', 'b3'],
+    min: 0,
+    max: 255
+    });
+var thumb = ui.Thumbnail({
+    image: logo,
+    params: {
+        dimensions: '642x291',
+        format: 'png'
+        },
+    style: {height: '230px', width: '370px',padding :'0'}
+    });
+
+var brid = ui.Label('Mangrove memiliki peranan penting dalam pencegahan pemanasan global dengan menyerap karbon lebih baik daripada vegetasi lainnya. Indonesia dianugerahi luasan hutan mangrove terbesar di dunia, tetapi juga memiliki laju kerusakan mangrove yang terbesar di dunia. Ditambah lagi produksi sampah Indonesia yang mengancam keberadaan mangrove. Platform ini bertujuan untuk membantu monitoring mangrove Indonesia khususnya akibat dampak sampah plastik yang berisikan :', {fontWeight: 'bold',fontSize: '13px', color: 'Black',textAlign : 'justify'});
+var subheader = ui.Label('1. Potensi Dampak Sampah di Kawasan Mangrove', {fontWeight: 'bold',fontSize: '13px', color: 'Black'});
+var text = ui.Label(
+    '2. Potensi Dampak Kualitas Air di Kawasan Mangrove ',
+    {fontWeight: 'bold',fontSize: '13px', color: 'Black'});
+var text2 = ui.Label(
+    '3. Potensi Peningkatan Suhu ',
+    {fontWeight: 'bold',fontSize: '13px', color: 'Black'});
+var dataTable = [
+  [
+    {label: 'Tingkat Risiko', role: 'domain', type: 'string'},
+    {label: 'Luas (ha)', role: 'data', type: 'number'},
+    {label: 'Luas. annotation', role: 'annotation', type: 'string'}
+  ],
+  ['Rendah', 422497.048, '18.30%'],
+  ['Sedang', 945396.7533, '40.94%'],
+  ['Tinggi', 782214.3368, '33.87%'],
+  ['Sangat Tinggi', 159261.5212, '6.9%']
+];
+
+// Define the chart and print it to the console.
+
+var chart = ui.Chart(dataTable).setChartType('PieChart').setOptions({
+  title: 'Luas Area Mangrove Berpotensi Rusak',
+  legend: {position: 'bottom-right'},
+  hAxis: {title: 'Tingkat Risiko', titleTextStyle: {italic: false, bold: true, color : 'black'}},
+  vAxis: {title: 'Luas (ha)', titleTextStyle: {italic: false, bold: true,color: 'black'}},
+  colors: ['04ff00','edd000','ffbe08','ff0000']
+});
+
+var toolPanel = ui.Panel([thumb,brid, subheader, text,text2,chart], 'flow', {width: '400px',color : 'black'});
+ui.root.widgets().add(toolPanel);
+
+var locationDict = {
+  'Bali': {lon: 115.1943, lat: -8.7315, zoom: 12},
+  'Kepulauan Riau': {lon: 108.1713, lat: 3.9432, zoom: 10},
+  'Samarinda' : {lon: 117.3687, lat: -0.6061, zoom: 10},
+  'Surabaya' : {lon: 112.75697238453265, lat: -7.197802507893524, zoom: 14},
+  'Wonorejo' : {lon: 112.824, lat: -7.3241, zoom: 12},
+  'Indramayu' : {lon: 108.2027, lat: -6.289, zoom: 12},
+  'Tanjung Selor' : {lon: 117.4844, lat: 2.9213, zoom: 9},
+};
+
+
+
+
+// Take all tools off the map except the zoom and mapTypeControl tools.
+
+
+var locations = Object.keys(locationDict);
+var locationSelect = ui.Select({
+  items: locations,
+  value: locations[5],
+  onChange: function(value) {
+    var location = locationDict[value];
+    rightMap.setCenter(location.lon, location.lat, location.zoom);
+    leftMap.setCenter(location.lon, location.lat, location.zoom);
+  }
+});
+
+var locationPanel = ui.Panel([
+  ui.Label('Area potensi kerusakan tertinggi', {'font-size': '17px',fontWeight: 'bold'}), locationSelect
+]);
+toolPanel.add(locationPanel);
+
+var pemb = ui.Label('Title', {fontSize: '17px', color: 'Black'});
+var pemb1 = ui.Label(
+    'Name', {},
+    'Link');
+
+var pembi1 = ui.Panel(
+    [ui.Label('Tittle', {fontWeight: 'bold'}),pemb1])
+toolPanel.add(pembi1);
+
+var uy = ui.Label('Name Grup',{fontWeight: 'bold'})
+var tim1 = ui.Label('1. Name1', {},
+    'Link');
+var tim2 = ui.Label('2. Name2', {},
+    'Link');
+var tim3 = ui.Label('3. Name3', {},
+    'Link');
+var tim4 = ui.Label('4. Name4', {},
+    'Link');
+var tim5 = ui.Label('5.Name 5', {},
+    'Link');
+var tim = ui.Panel(
+    [ui.Label('Name grup', {fontWeight: 'bold'}),tim1,tim2,tim3,tim4,tim5])
+toolPanel.add(tim);
+
+
+
+function ColorBar(palette) {
+  return ui.Thumbnail({
+    image: ee.Image.pixelLonLat().select(0),
+    params: {
+      bbox: [0, 0, 1, 0.1],
+      dimensions: '100x10',
+      format: 'png',
+      min: 0,
+      max: 1,
+      palette: palette,
+    },
+    style: {stretch: 'horizontal', margin: '0px 8px'},
+  });
+}
+
+var legend = ui.Panel({
+  style: {
+    position: 'bottom-left',
+    padding: '8px 15px',
+    
+  }});
+ 
+var legendTitle = ui.Label({
+  value: 'Tingkat Kerentanan',
+  style: {fontWeight: 'bold',
+    fontSize: '17px',
+    margin: '0 0 4px 0',
+    padding: '0',
+    color : '#0e1626'
+    }});
+ 
+legend.add(legendTitle);
+
+leftMap.add(legend);
+
+
+var makeRow = function(color, name) {
+ 
+        var colorBox = ui.Label({
+        style: {
+          backgroundColor: '#' + color,
+          padding: '12px',
+          margin: '0 0 4px 0'
+        }});
+ 
+            var description = ui.Label({
+        value: name,
+        style: {margin: '0 0 6px 8px'}
+      });
+ 
+        return ui.Panel({
+        widgets: [colorBox, description],
+        layout: ui.Panel.Layout.Flow('horizontal')
+      })};
+ 
+var palette =['ff0000','ffbe08','fbff00','04ff00'];
+ 
+var names = ['Sangat Tinggi','Tinggi','Sedang','Rendah'];
+ 
+for (var i = 0; i < 4; i++) {
+  legend.add(makeRow(palette[i], names[i]));
+  }
+
+//Map.addLayer(KLHP.clip(indo))
